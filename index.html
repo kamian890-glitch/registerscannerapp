@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ur">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101d32">
+<title>JANTEX REGISTER SCANNER</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+<style>
+:root{--bg:#0b1424;--panel:#14243a;--teal:#16b6a4;--txt:#f3f7fb;--muted:#a8b8ca}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Arial,sans-serif}
+header{padding:22px 16px;text-align:center;background:#101d32;border-bottom:1px solid #263c55}
+h1{font-size:22px;margin:0 0 7px;letter-spacing:.5px}header small{color:var(--muted)}
+main{max-width:850px;margin:auto;padding:16px}.panel{background:var(--panel);padding:16px;border:1px solid #2b4058;border-radius:15px;margin:0 0 15px}
+h2{font-size:18px;margin:0 0 13px}.row{display:flex;gap:9px;flex-wrap:wrap}
+button,.filebtn{background:var(--teal);color:#06201e;border:0;padding:12px 15px;border-radius:9px;font-weight:bold;cursor:pointer;font-size:14px}
+button.secondary,.filebtn.secondary{background:#263c55;color:white}button:disabled{opacity:.5}
+input,select{width:100%;padding:12px;border:1px solid #38516c;border-radius:8px;background:#0d1a2c;color:white;font-size:16px}
+label{display:block;color:var(--muted);font-size:13px;margin:12px 0 6px}
+#previewWrap{display:none;margin-top:14px}#preview{max-width:100%;display:block;max-height:55vh}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.status{color:#ffd27a;margin-top:10px;white-space:pre-wrap;font-size:14px}
+.record{border-top:1px solid #31465d;padding:12px 0;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.record small{color:var(--muted)}.record a{color:#4fe0cf}
+@media(max-width:560px){.fields,.controls{grid-template-columns:1fr}button,.filebtn{flex:1}.record{align-items:flex-start;flex-direction:column}}
+</style></head>
+<body>
+<header><h1>JANTEX REGISTER SCANNER</h1><small>Created by Kamran_Zahoor</small></header>
+<main>
+<section class="panel">
+<h2>1۔ رجسٹر کی تصویر منتخب کریں</h2>
+<div class="row">
+<label class="filebtn" for="camera">📷 Camera</label><input hidden id="camera" type="file" accept="image/*" capture="environment">
+<label class="filebtn secondary" for="gallery">🖼 Gallery</label><input hidden id="gallery" type="file" accept="image/*">
+</div>
+<div id="previewWrap">
+<img id="preview" alt="تصویر کا پیش منظر">
+<div class="controls">
+<button class="secondary" id="rotate">Rotate 90°</button>
+<button class="secondary" id="auto">Auto Adjust</button>
+</div>
+<label>Brightness</label><input id="brightness" type="range" min="70" max="150" value="100">
+<label>Contrast</label><input id="contrast" type="range" min="70" max="160" value="100">
+<p class="status">تصویر کو Crop کرنے کے لیے تصویر کے کناروں کو کھینچیں۔ پھر Extract Data دبائیں۔</p>
+<button id="extract" style="width:100%;margin-top:10px">Extract Data</button>
+</div><div id="msg" class="status"></div>
+</section>
+<section class="panel">
+<h2>2۔ ڈیٹا چیک اور درست کریں</h2>
+<div class="fields" id="fields"></div>
+<button id="save" style="width:100%;margin-top:15px" disabled>Save Record</button>
+<div id="saveMsg" class="status"></div>
+</section>
+<section class="panel">
+<h2>3۔ Master Excel اور ریکارڈ</h2>
+<div class="row"><button id="download">Download Master Excel</button><button class="secondary" id="refresh">Refresh Records</button></div>
+<label>Lot Number / Name / Date تلاش کریں</label><input id="search" placeholder="تلاش کریں...">
+<div id="records" style="margin-top:12px"></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<script>
+const names=[["register_date","Register Date"],["lot_number","Lot Number"],["lot_name","Lot Name"],["quality","Quality"],["total_colors","Total Colors"],["report_date","Report Date"],["received_colors","Received Colors"]];
+const fields=document.getElementById("fields");
+names.forEach(([k,n])=>fields.insertAdjacentHTML("beforeend",`<div><label>${n}</label><input id="${k}" autocomplete="off"></div>`));
+let cropper=null,finalImage="",selectedFile=null;
+const preview=document.getElementById("preview"),wrap=document.getElementById("previewWrap"),msg=document.getElementById("msg");
+function setMsg(t){msg.textContent=t}
+async function loadFile(file){
+ if(!file)return; selectedFile=file; finalImage="";
+ if(cropper){cropper.destroy();cropper=null}
+ preview.src=URL.createObjectURL(file);wrap.style.display="block";
+ preview.onload=()=>{cropper=new Cropper(preview,{viewMode:1,autoCropArea:.95,background:false,zoomOnWheel:true,rotatable:true, movable:true, responsive:true});};
+ document.getElementById("save").disabled=true;setMsg("تصویر تیار ہے۔ Crop درست کریں یا Auto Adjust استعمال کریں۔");
+}
+document.getElementById("camera").onchange=e=>loadFile(e.target.files[0]);
+document.getElementById("gallery").onchange=e=>loadFile(e.target.files[0]);
+document.getElementById("rotate").onclick=()=>cropper?.rotate(90);
+document.getElementById("auto").onclick=()=>{
+ if(!cropper)return;
+ const c=cropper.getCroppedCanvas({maxWidth:2200,maxHeight:2200});
+ const ctx=c.getContext("2d"),im=ctx.getImageData(0,0,c.width,c.height);
+ const b=1.06,contrast=1.12;
+ for(let i=0;i<im.data.length;i+=4)for(let j=0;j<3;j++)im.data[i+j]=Math.max(0,Math.min(255,((im.data[i+j]-128)*contrast+128)*b));
+ ctx.putImageData(im,0,0);preview.src=c.toDataURL("image/jpeg",.92);
+ if(cropper){cropper.destroy();cropper=null}
+ preview.onload=()=>cropper=new Cropper(preview,{viewMode:1,autoCropArea:.96,background:false,rotatable:true});
+ setMsg("تصویر بہتر کی گئی ہے۔ ضرورت ہو تو Crop دوبارہ درست کریں۔");
+};
+function getFinalImage(){
+ if(!cropper)throw Error("پہلے تصویر منتخب کریں۔");
+ const c=cropper.getCroppedCanvas({maxWidth:2400,maxHeight:2400,imageSmoothingQuality:"high"});
+ const b=Number(document.getElementById("brightness").value),co=Number(document.getElementById("contrast").value);
+ const ctx=c.getContext("2d"),im=ctx.getImageData(0,0,c.width,c.height),factor=co/100;
+ for(let i=0;i<im.data.length;i+=4)for(let j=0;j<3;j++)im.data[i+j]=Math.max(0,Math.min(255,((im.data[i+j]-128)*factor+128)*b/100));
+ ctx.putImageData(im,0,0);return c.toDataURL("image/jpeg",.9);
+}
+document.getElementById("extract").onclick=async()=>{
+ try{
+  setMsg("تصویر تیار ہو رہی ہے...");const data=getFinalImage();finalImage=data;
+  const blob=await (await fetch(data)).blob();const fd=new FormData();fd.append("image",blob,"register.jpg");
+  setMsg("AI تصویر پڑھ رہا ہے، براہ کرم انتظار کریں...");
+  const r=await fetch("/api/extract",{method:"POST",body:fd}),j=await r.json();
+  if(!r.ok)throw Error(j.error||"Extraction ناکام ہوئی۔");
+  names.forEach(([k])=>document.getElementById(k).value=j.data[k]||"");
+  document.getElementById("save").disabled=false;document.getElementById("saveMsg").textContent="ڈیٹا آ گیا ہے۔ تمام خانے چیک کرکے Save کریں۔";
+  setMsg("Extraction مکمل۔");
+ }catch(e){setMsg(e.message+"\nآپ خود بھی خانے پُر کرکے Save کر سکتے ہیں۔");document.getElementById("save").disabled=false;if(!finalImage&&cropper)try{finalImage=getFinalImage()}catch{}}
+};
+document.getElementById("save").onclick=async()=>{
+ try{
+  const d={};names.forEach(([k])=>d[k]=document.getElementById(k).value.trim());d.image_data=finalImage;
+  if(!d.lot_number)throw Error("Lot Number درج کریں۔");
+  const r=await fetch("/api/records",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}),j=await r.json();
+  if(!r.ok)throw Error(j.error||"Save ناکام ہوئی۔");
+  document.getElementById("saveMsg").textContent="ریکارڈ محفوظ ہوگیا۔ نمبر: "+j.id;
+  document.getElementById("save").disabled=true;await loadRecords();
+ }catch(e){document.getElementById("saveMsg").textContent=e.message}
+};
+async function loadRecords(){
+ const q=document.getElementById("search").value;const r=await fetch("/api/records?q="+encodeURIComponent(q));const rows=await r.json();
+ const box=document.getElementById("records");box.innerHTML="";
+ if(!rows.length){box.textContent="ابھی کوئی ریکارڈ موجود نہیں۔";return}
+ rows.forEach(x=>{const d=document.createElement("div");d.className="record";const info=document.createElement("div");info.innerHTML=`<b>${esc(x.lot_number)} — ${esc(x.lot_name)}</b><br><small>${esc(x.register_date)} | Quality: ${esc(x.quality)}</small>`;d.appendChild(info);if(x.image_path){const a=document.createElement("a");a.href=x.image_path;a.target="_blank";a.textContent="تصویر دیکھیں";d.appendChild(a)}box.appendChild(d)});
+}
+function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+document.getElementById("download").onclick=()=>location.href="/api/master.xlsx";
+document.getElementById("refresh").onclick=loadRecords;
+document.getElementById("search").oninput=loadRecords;
+loadRecords();
+</script></body></html>
